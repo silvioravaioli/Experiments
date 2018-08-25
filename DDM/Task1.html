@@ -1,0 +1,157 @@
+<!doctype html>
+<html>
+  <head>
+    <title>ECON 4850 - Choice Experiment 1</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="jspsych-5.0/jspsych.js"></script>
+    <script src="jspsych-5.0/plugins/jspsych-text.js"></script>
+    <script src="jspsych-5.0/plugins/jspsych-single-stim.js"></script>
+    <script src="jspsych-5.0/plugins/jspsych-survey-text.js"></script>
+    <script src="jspsych-5.0/plugins/jspsych-survey-likert.js"></script>
+    <script src="jspsych-5.0/plugins/jspsych-similarity.js"></script>
+    <script src="jspsych-5.0/plugins/jspsych-binary-choice.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
+    <link href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/themes/black-tie/jquery-ui.min.css" rel="stylesheet" type="text/css"></link>
+    <link href="jspsych-5.0/css/jspsych.css" rel="stylesheet" type="text/css"></link>
+  </head>
+  </body>
+  <script>
+
+/* define welcome message block */
+var welcome_block = {
+      type: "text",
+      text: "Welcome to the first section of the experiment. Press any key to continue."
+  };
+
+/* insert UNI */
+var uni_block = {
+    type: "survey-text",
+    questions: ["Enter your UNI (letters and digits) in the box below and press submit to begin the first task."],
+    rows: [1],
+    columns: [10],
+    on_finish: function(trial_data){
+        var entercode = [trial_data.responses[7] + trial_data.responses[8] + trial_data.responses[9] + trial_data.responses[10] + trial_data.responses[11] + trial_data.responses[12]];
+        jsPsych.data.addProperties({uni_code: entercode});
+    }
+};
+
+/* define instructions message block */
+var instructions_block = {
+    type: "text",
+    text: "<p>In this task, a sequence of snack items will appear on the screen.</p>" +
+        "<p>Please state your willingness to pay for each product, i.e. the maximum " +
+        "amount that you would be willing to pay in order to buy that product. You can " +
+        "select any value from $0 to $5 by moving the on-screen slider with the mouse. " +
+        "Clicking the submit button will allow you to proceed to the next item.</p></div>" +
+        "<p>Press any key to begin.</p>",
+        timing_post_trial: 2000
+};
+
+/* define list of stimuli to show */
+var new_stimuli = [];
+for (var i1 = 1; i1<=30; i1++){
+  new_stimuli.push({stimuli: ['<div class="center-content"><img src="img/' + i1 + '_food.jpg"></img></div>'], data: {item1: i1}});
+}
+
+/* randomize stimuli (1 repetition of each stimulus) */
+var flag = 1 //flag=1 if something is wrong
+while (flag >0) {
+    flag = 0; //initialize to zero at the begin of the cycle
+    var all_trials = jsPsych.randomization.repeat(new_stimuli,3); //randomize and create an array with -30
+    var distance = [-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30,-30];
+    for (var j = 1; j<=90; j++){ //verify all the 90 elements in the new array
+      if ((j - distance[all_trials[j].item1]) < 5){ //minimum distance: 5
+        flag = 1;
+      }
+      else {
+        distance[all_trials[j].data.item1] = j;
+      }
+    }
+}
+
+/* randomize time after trial */
+var post_trial_gap = function() {
+//    return Math.floor( Math.random() * 750 ) + 250;
+    return Math.floor( Math.random() * 1 ) + 1;
+};
+
+/* choice block */
+var test_block = {
+    type: 'similarity',
+    labels: ['$ 0','$ 1','$ 2','$ 3','$ 4','$ 5'], //values for the slider
+    intervals: 101,
+    show_ticks: false,
+    timing_first_stim: 1, //1ms for the first image
+    timing_image_gap: 1,  //1ms between image 1 and 2
+    prompt:"<p><center>Drag the slider to indicate what is the most you would pay for this item.</center></p>",
+    is_html: true,
+    timing_post_trial: post_trial_gap,
+    timeline: all_trials,
+    on_finish: function(trial_data){
+        var bidding = (trial_data.sim_score-1)/20;
+        jsPsych.data.addDataToLastTrial({bidding: bidding});
+    }
+};
+
+/* summary statistics */
+function getSubjectData() {
+      var trials = jsPsych.data.getTrialsOfType('similarity');
+      var sum_rt = 0;
+      var sum_score = 0;
+      for (var i = 0; i < trials.length; i++) {
+            sum_rt += trials[i].rt;
+            sum_score += trials[i].sim_score;
+          }
+      return {
+        rt: Math.floor(sum_rt / trials.length),
+        sim_score: Math.floor((sum_score - trials.length)/trials.length),
+      }
+}
+
+/* debrief block statistics */
+var debrief_block = {
+      type: "text",
+      text: function() {
+        var subject_data = getSubjectData();
+        return "<p>You completed the first task. Your average response time was <strong>" +
+        subject_data.rt + " ms</strong>.</p><p>The average value you assigned was<strong> $ " +
+        subject_data.sim_score/20 + "</strong>. Press any key to display the raw data from this task, "+
+        "and proceed to the next task.</p>";
+       }
+};
+
+/* create experiment timeline array */
+var timeline = [];
+timeline.push(welcome_block);       // welcome message
+timeline.push(uni_block);           // insert UNI
+timeline.push(instructions_block);  // instructions
+timeline.push(test_block);          // expriment
+timeline.push(debrief_block);       // summary statistics
+
+/* save data code snippet */
+function save_data(data){
+     var data_table = "peacock_1"; // change this for different experiments
+     $.ajax({
+        type:'post',
+        cache: false,
+        url: 'savedata.php', // change this to point to your php file.
+        data: {
+            table: data_table,
+            json: JSON.stringify(data),
+        },
+        success: function(output) { console.log(output); } // write the result to javascript console
+     });
+}
+
+/* start the experiment */
+jsPsych.init({
+timeline: timeline,
+on_finish: function(data) {
+    var alldata = jsPsych.data.getData();
+    jsPsych.data.displayData('CSV');
+    save_data(alldata);
+    jsPsych.data.localSave('mydata_1.csv', 'csv');
+}
+});
+  </script>
+</html>
