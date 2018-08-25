@@ -1,0 +1,150 @@
+<!doctype html>
+<html>
+  <head>
+    <title>ECON 4850 - Choice Experiment 2</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="jspsych-5.0/jspsych.js"></script>
+    <script src="jspsych-5.0/plugins/jspsych-text.js"></script>
+    <script src="jspsych-5.0/plugins/jspsych-single-stim.js"></script>
+    <script src="jspsych-5.0/plugins/jspsych-survey-text.js"></script>
+    <script src="jspsych-5.0/plugins/jspsych-survey-likert.js"></script>
+    <script src="jspsych-5.0/plugins/jspsych-similarity.js"></script>
+    <script src="jspsych-5.0/plugins/jspsych-binary-choice.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
+    <link href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/themes/black-tie/jquery-ui.min.css" rel="stylesheet" type="text/css"></link>
+    <link href="jspsych-5.0/css/jspsych.css" rel="stylesheet" type="text/css"></link>
+  </head>
+  <body>
+  </body>
+  <script>
+
+/* define welcome message block */
+var welcome_block = {
+    type: "text",
+    text: "Welcome to the second section of the experiment. Press any key to continue."
+};
+
+/* insert UNI */
+var uni_block = {
+    type: "survey-text",
+    questions: ["Enter your UNI (letters and digits) in the box below and press submit to begin the second task."],
+    rows: [1],
+    columns: [10],
+    on_finish: function(trial_data){
+        var entercode = [trial_data.responses[7] + trial_data.responses[8] + trial_data.responses[9] + trial_data.responses[10] + trial_data.responses[11] + trial_data.responses[12]];
+        jsPsych.data.addProperties({uni_code: entercode});
+    }
+};
+
+/* define instructions message block */
+var instructions_block = {
+    type: "text",
+    text: "<p>In every trial of this task, two snack items will appear on the screen.</p>" +
+        "<p>Your task is to indicate which of the two snack items you would rather have. " +
+        "Press the Q key to choose the item on the left or the P key to choose the item on the right.</p></div>" +
+        "<p>Press any key to begin.</p>",
+        timing_post_trial: 2000
+};
+
+/* i is a counter and indicates current trial (starts at 1 and is updated after each choice) */
+var i=1;
+var next = function(){
+    i = i+1;
+}
+
+/* sorted list of stimuli, nested cycle generates the list of simple combinations (pairs) */
+var new_stimuli=[];
+for (var i1 = 1; i1<=30; i1++){
+  for (var i2 = i1+1; i2<=30; i2++){
+    new_stimuli.push({stimuli: ["img/" + i1 + "_food.jpg","img/" + i2 + "_food.jpg"],data: {item1: i1, item2: i2}});
+  }
+}
+/* the order of the list is randomized*/
+var all_trials = jsPsych.randomization.repeat(new_stimuli,2);
+
+/* randomize time after trial */
+var post_trial_gap = function() {
+    return Math.floor( Math.random() * 750 ) + 250;
+}
+
+/* choice block */
+var test_block = {
+  type: "binary-choice",
+  choices: ['F'],
+  prompt:"<p><center>Press Q key to choose the option on the left or P key to choose the option on the right.</center></p>",
+  timing_response: 1500,
+  timing_post_trial: post_trial_gap,
+  on_finish: function(data){
+    var frog = data.item1;      //they are called frog
+    var frog2 = data.item2;     //because they can jump
+    if(data.reverse == true){   //resort item1 and 2 if required
+      jsPsych.data.addDataToLastTrial({item1: frog2}); //item1 = left
+      jsPsych.data.addDataToLastTrial({item2: frog});  //item2 = right
+     }
+    var correct = true;
+    jsPsych.data.addDataToLastTrial({correct: correct});
+    var round = i;
+    jsPsych.data.addDataToLastTrial({round: round}); //indicates current trial
+    next();
+  },
+  timeline: all_trials
+};
+
+/* summary statistics */
+function getSubjectData() {
+      var trials = jsPsych.data.getTrialsOfType('binary-choice');
+      var sum_rt = 0;
+      for (var i = 0; i < trials.length; i++) {
+            sum_rt += trials[i].rt;
+          }
+      return {
+        rt: Math.floor(sum_rt / trials.length),
+      }
+}
+
+/* debrief block statistics */
+var debrief_block = {
+      type: "text",
+      text: function() {
+        var subject_data = getSubjectData();
+        return "<p>You completed the second task. Your average response time was <strong>" +
+        subject_data.rt + " ms</strong>.</p><p>Press any key to display the raw data from this task, "+
+        "and proceed to the next task.</p>";
+       }
+};
+
+/* create experiment timeline array */
+var timeline = [];
+timeline.push(welcome_block);       // welcome message
+timeline.push(uni_block);           // insert UNI
+timeline.push(instructions_block);  // instructions
+timeline.push(test_block);          // expriment
+timeline.push(debrief_block);       // summary statistics
+
+/* save data code snippet */
+function save_data(data){
+     var data_table = "peacock"; // change this for different experiments
+     $.ajax({
+        type:'post',
+        cache: false,
+        url: 'savedata.php', // change this to point to your php file.
+        data: {
+            table: data_table,
+            json: JSON.stringify(data),
+        },
+        success: function(output) { console.log(output); } // write the result to javascript console
+     });
+}
+
+/* start the experiment */
+jsPsych.init({
+timeline: timeline,
+on_finish: function(data) {
+    var alldata = jsPsych.data.getData();
+    jsPsych.data.displayData('CSV');
+    save_data(alldata);
+    jsPsych.data.localSave('mydata_2.csv', 'csv');
+}
+});
+  </script>
+</html>
